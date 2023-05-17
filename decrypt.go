@@ -17,42 +17,46 @@ import (
 )
 
 func decryptData(privKeyFile, inputFile, outputFile string) error {
+	// Open input file
 	infile, err := os.Open(inputFile)
 	if err != nil {
 		return err
 	}
 	defer infile.Close()
 
+	// Parse header
 	header, err := parseHeader(infile)
 	if err != nil {
 		return err
 	}
-
+	// Read private key
 	privateKey, err := BytesToPrivateKey(privKeyFile)
 	if err != nil {
 		return err
 	}
-
+	// Decrypt AES key
 	decryptedAESKey, err := decryptWithPrivateKey(header.AESKey, privateKey)
 	if err != nil {
 		return err
 	}
-
+	// Decrypt IV
 	decryptedIV, err := decryptWithPrivateKey(header.IV, privateKey)
 	if err != nil {
 		return err
 	}
+
+	// Prepare AES block cipher
 	block, err := aes.NewCipher(decryptedAESKey)
 	if err != nil {
 		log.Panic(err)
 	}
-
+	// Open output file
 	outfile, err := os.OpenFile(outputFile, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0777)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer outfile.Close()
-
+	// Decrypt file and write to output file
 	buf := make([]byte, 1024)
 	stream := cipher.NewCTR(block, decryptedIV)
 	for {
@@ -104,15 +108,17 @@ func BytesToPrivateKey(privKeyFile string) (privateKey *rsa.PrivateKey, err erro
 }
 
 func parseHeader(infile *os.File) (header tHeader, err error) {
+	// Read header
 	marker := make([]byte, 3)
 	if _, err := io.ReadFull(infile, marker); err != nil {
 		return header, err
 	}
-	if string(marker) != "mme" {
+	// Check marker
+	if string(marker) != "sme" {
 		return header, errors.New("invalid file format")
 	}
 	headerBytes := make([]byte, 0)
-
+	// Read header bytes
 	for {
 		b := make([]byte, 1)
 		if _, err := io.ReadFull(infile, b); err != nil {
@@ -123,6 +129,7 @@ func parseHeader(infile *os.File) (header tHeader, err error) {
 		}
 		headerBytes = append(headerBytes, b[0])
 	}
+	// Decode header
 	headerBase64, err := base64.StdEncoding.DecodeString(string(headerBytes))
 	if err != nil {
 		return header, err

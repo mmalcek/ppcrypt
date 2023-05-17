@@ -23,8 +23,9 @@ type tHeader struct {
 	TimeStamp int64  `json:"time_stamp"`
 }
 
-// Encrypt encrypts a message using a public key
+// Encryptfile using a public key
 func encryptData(pubKeyFile, inputFile, outputFile string) error {
+	// Open input file
 	infile, err := os.Open(inputFile)
 	if err != nil {
 		return err
@@ -32,52 +33,56 @@ func encryptData(pubKeyFile, inputFile, outputFile string) error {
 	defer infile.Close()
 
 	// Random 32 byte key for AES encryption
-	AESKey := make([]byte, 32)
-	if _, err := rand.Read(AESKey); err != nil {
+	aesKey := make([]byte, 32)
+	if _, err := rand.Read(aesKey); err != nil {
 		return err
 	}
-
-	block, err := aes.NewCipher(AESKey)
+	// Create AES block cipher
+	block, err := aes.NewCipher(aesKey)
 	if err != nil {
 		return err
 	}
-
+	// Random IV
 	iv := make([]byte, block.BlockSize())
 	if _, err := io.ReadFull(rand.Reader, iv); err != nil {
 		return err
 	}
-
+	// Open output file
 	outfile, err := os.OpenFile(outputFile, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0777)
 	if err != nil {
 		return err
 	}
 	defer outfile.Close()
-
+	// Read public key
 	publicKey, err := bytesToPublicKey(pubKeyFile)
 	if err != nil {
 		return err
 	}
-	encryptedAESKey, err := encryptWithPublicKey(AESKey, publicKey)
+	// Encrypt AES key with public key
+	encryptedAESKey, err := encryptWithPublicKey(aesKey, publicKey)
 	if err != nil {
 		return err
 	}
+	// Encrypt IV with public key
 	encryptedIV, err := encryptWithPublicKey(iv, publicKey)
 	if err != nil {
 		return err
 	}
 
+	// Create header
 	header := tHeader{AESKey: encryptedAESKey, IV: encryptedIV, TimeStamp: time.Now().Unix()}
 	headerBytes, err := json.Marshal(header)
 	if err != nil {
 		return err
 	}
-
 	headerBytes = []byte(base64.StdEncoding.EncodeToString(headerBytes))
+
 	// Write header
-	outfile.Write([]byte("mme"))
+	outfile.Write([]byte("sme"))
 	outfile.Write(headerBytes)
 	outfile.Write([]byte{0})
 
+	// Encrypt file
 	buf := make([]byte, 1024)
 	stream := cipher.NewCTR(block, iv)
 	for {
